@@ -1,5 +1,5 @@
-# brand-protocol-problem_1
-Assignment submission for Brand Protocol
+# band-protocol-problem_1
+Assignment submission for Band Protocol
 
 Problem 1: Boss Baby's Revenge
 Description:
