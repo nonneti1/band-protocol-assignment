@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 // Transaction struct represent the data structure for the payload
 type Transaction struct {
-	symbol    string `json:"symbol"`
-	price     uint64 `json:"price"`
-	timestamp uint64 `json:"timestamp"`
+	Symbol    string `json:"symbol"`
+	Price     uint64 `json:"price"`
+	Timestamp uint64 `json:"timestamp"`
 }
 
 // Transaction status represent status in string
@@ -21,51 +22,45 @@ type TxStatus string
 // BroadcastTransaction broadcasts a transaction to the api
 func BroadcastTransaction(tx Transaction) (string, error) {
 	jsonData, err := json.Marshal(tx)
+
 	if err != nil {
-		// Handle the error
 		return "", fmt.Errorf("failed to marshal data: %w", err)
 	}
+
 	url := "https://mock-node-wgqbnxruha-as.a.run.app/broadcast"
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+
+	res, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+
 	if err != nil {
-		// Handle the error
-		return "", fmt.Errorf("failed to create a http request : %w", err)
+		return "", fmt.Errorf("failed to make a post request %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		// Handle the error
-		return "", fmt.Errorf("failed to make a request to api server : %w", err)
+		return "", fmt.Errorf("failed to read the response body %w", err)
 	}
-	defer resp.Body.Close()
+	var result map[string]string
 
-	// Print response body for debugging
-	responseBody, err := io.ReadAll(resp.Body)
+	err = json.Unmarshal([]byte(body), &result)
+
 	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
+		return "", fmt.Errorf("error unmarshaling data from request %w", err)
 	}
-	fmt.Println(string(responseBody))
 
-	// Check response status code
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-	return "", nil
+	fmt.Println(42, result)
+	return result["tx_hash"], nil
 }
 
 // MonitorTransactionStatus monitors the status of a transaction by its hash
 func MonitorTransactionStatus(txHash string) (TxStatus, error) {
 	url := fmt.Sprintf("https://mock-node-wgqbnxruha-as.a.run.app/check/%s", txHash)
-	resp, err := http.Get(url)
+	res, err := http.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to get transaction status: %w", err)
 	}
-	defer resp.Body.Close()
+	defer res.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -78,9 +73,9 @@ func MonitorTransactionStatus(txHash string) (TxStatus, error) {
 
 func main() {
 	tx := Transaction{
-		symbol:    "ETH",
-		price:     4500,
-		timestamp: 1678912345,
+		Symbol:    "ETH",
+		Price:     4500,
+		Timestamp: 1678912345,
 	}
 	txHash, err := BroadcastTransaction(tx)
 
@@ -91,15 +86,15 @@ func main() {
 	fmt.Println("Transaction hash:", txHash)
 
 	// Monitor transaction status with retry logic
-	// var status TxStatus
-	// for {
-	// 	status, err = MonitorTransactionStatus(txHash)
-	// 	if err != nil {
-	// 		fmt.Println("Error getting transaction status:", err)
-	// 	} else {
-	// 		fmt.Println("Transaction status:", status)
-	// 		break
-	// 	}
-	// 	time.Sleep(5 * time.Second) // Wait 5 seconds before retrying
-	// }
+	var status TxStatus
+	for {
+		status, err = MonitorTransactionStatus(txHash)
+		if err != nil {
+			fmt.Println("Error getting transaction status:", err)
+		} else {
+			fmt.Println("Transaction status:", status)
+			break
+		}
+		time.Sleep(5 * time.Second) // Wait 5 seconds before retrying
+	}
 }
